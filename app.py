@@ -1,47 +1,125 @@
-import os
-from flask import Flask, render_template, request, redirect, url_for, jsonify
-from flask_mysqldb import MySQL
+from flask import Flask, render_template, request, redirect, url_for
+import mysql.connector
+from mysql.connector import Error
 
 app = Flask(__name__)
 
-# Configure MySQL from environment variables
-app.config['MYSQL_HOST'] = os.environ.get('MYSQL_HOST', 'localhost')
-app.config['MYSQL_USER'] = os.environ.get('MYSQL_USER', 'default_user')
-app.config['MYSQL_PASSWORD'] = os.environ.get('MYSQL_PASSWORD', 'default_password')
-app.config['MYSQL_DB'] = os.environ.get('MYSQL_DB', 'default_db')
 
-# Initialize MySQL
-mysql = MySQL(app)
+# -------------------------------
+# Database Connection Function
+# -------------------------------
+def get_db_connection():
+    try:
+        conn = mysql.connector.connect(
+            host="YOUR_DB_HOST",
+            user="YOUR_DB_USER",
+            password="YOUR_DB_PASSWORD",
+            database="YOUR_DB_NAME"
+        )
+        return conn
+    except Error as e:
+        print("MySQL Connection Error:", e)
+        return None
 
-def init_db():
-    with app.app_context():
-        cur = mysql.connection.cursor()
-        cur.execute('''
-        CREATE TABLE IF NOT EXISTS messages (
-            id INT AUTO_INCREMENT PRIMARY KEY,
-            message TEXT
-        );
-        ''')
-        mysql.connection.commit()  
-        cur.close()
 
-@app.route('/')
-def hello():
-    cur = mysql.connection.cursor()
-    cur.execute('SELECT message FROM messages')
-    messages = cur.fetchall()
-    cur.close()
-    return render_template('index.html', messages=messages)
+# ------------------------------------------------
+# HOME PAGE
+# ------------------------------------------------
+@app.route("/")
+def index():
+    return render_template("index.html")
 
-@app.route('/submit', methods=['POST'])
-def submit():
-    new_message = request.form.get('new_message')
-    cur = mysql.connection.cursor()
-    cur.execute('INSERT INTO messages (message) VALUES (%s)', [new_message])
-    mysql.connection.commit()
-    cur.close()
-    return jsonify({'message': new_message})
 
-if __name__ == '__main__':
-    init_db()
-    app.run(host='0.0.0.0', port=5000, debug=True)
+# ------------------------------------------------
+# FETCH ALL RECORDS
+# ------------------------------------------------
+@app.route("/users")
+def users():
+    conn = get_db_connection()
+    if conn is None:
+        return "Database connection failed"
+
+    cursor = conn.cursor(dictionary=True)
+    cursor.execute("SELECT * FROM users")
+    rows = cursor.fetchall()
+
+    cursor.close()
+    conn.close()
+
+    return render_template("users.html", users=rows)
+
+
+# ------------------------------------------------
+# ADD USER
+# ------------------------------------------------
+@app.route("/add", methods=["POST"])
+def add_user():
+    name = request.form.get("name")
+
+    conn = get_db_connection()
+    if conn is None:
+        return "Database connection failed"
+
+    cursor = conn.cursor()
+    cursor.execute(
+        "INSERT INTO users (name) VALUES (%s)",
+        (name,)
+    )
+    conn.commit()
+
+    cursor.close()
+    conn.close()
+
+    return redirect(url_for("users"))
+
+
+# ------------------------------------------------
+# DELETE USER
+# ------------------------------------------------
+@app.route("/delete/<int:user_id>")
+def delete_user(user_id):
+
+    conn = get_db_connection()
+    if conn is None:
+        return "Database connection failed"
+
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM users WHERE id = %s", (user_id,))
+    conn.commit()
+
+    cursor.close()
+    conn.close()
+
+    return redirect(url_for("users"))
+
+
+# ------------------------------------------------
+# UPDATE USER
+# ------------------------------------------------
+@app.route("/update/<int:user_id>", methods=["POST"])
+def update_user(user_id):
+    new_name = request.form.get("name")
+
+    conn = get_db_connection()
+    if conn is None:
+        return "Database connection failed"
+
+    cursor = conn.cursor()
+    cursor.execute(
+        "UPDATE users SET name=%s WHERE id=%s",
+        (new_name, user_id)
+    )
+    conn.commit()
+
+    cursor.close()
+    conn.close()
+
+    return redirect(url_for("users"))
+
+
+# ------------------------------------------------
+# START APP
+# ------------------------------------------------
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=5000, debug=True)
+
