@@ -1,65 +1,40 @@
 pipeline {
-  agent any
+    agent any
 
-  environment {
-    APP_DIR = "/home/ubuntu/2-tier-app"
-    PYTHON_CMD = "python3"
-  }
-
-  stages {
-
-    stage('Checkout') {
-      steps {
-        echo "Checking out repository..."
-        checkout scm
-      }
+    environment {
+        EC2_USER     = "ubuntu"
+        EC2_HOST     = "13.201.33.136"
+        EC2_PATH     = "/home/ubuntu/2-tier-app"
+        SSH_KEY_ID   = "ec2-key"
+        PYTHON_CMD   = "python3"
     }
 
-    stage('Install Dependencies') {
-      steps {
-        echo "Installing Python dependencies..."
-        sh '''
-          set -e
-          ${PYTHON_CMD} -m pip install --upgrade pip --user
-          ${PYTHON_CMD} -m pip install --user -r requirements.txt
-        '''
-      }
-    }
+    stages {
 
-    stage('Run Tests') {
-      steps {
-        echo "Running tests..."
-        sh '''
-          if [ -d "tests" ]; then
-            ${PYTHON_CMD} -m pip install --user pytest
-            ${PYTHON_CMD} -m pytest || true
-          else
-            echo "No tests found, skipping."
-          fi
-        '''
-      }
-    }
+        stage('Checkout') {
+            steps {
+                echo "Checking out repository..."
+                checkout scm
+            }
+        }
 
-    stage('Deploy to EC2') {
-      steps {
-        echo "Deploying application..."
-        sh '''
-          mkdir -p ${APP_DIR}
-          cp -r . ${APP_DIR}/
-          if systemctl status flaskapp >/dev/null 2>&1; then
-            systemctl restart flaskapp || true
-          else
-            echo "No flaskapp service found."
-          fi
-        '''
-      }
-    }
+        stage('Install Dependencies') {
+            steps {
+                echo "Installing Python dependencies..."
+                sh """
+                    ${PYTHON_CMD} -m pip install --upgrade pip --user
+                    ${PYTHON_CMD} -m pip install --user -r requirements.txt
+                """
+            }
+        }
 
-  }
-
-  post {
-    success { echo "Pipeline SUCCESS" }
-    failure { echo "Pipeline FAILED" }
-  }
-}
+        stage('Run Tests') {
+            steps {
+                echo "Running tests..."
+                sh """
+                    if [ -d tests ]; then
+                        ${PYTHON_CMD} -m pip install --user pytest
+                        ${PYTHON_CMD} -m pytest || true
+                    else
+                        echo "No tests found — skippin
 
