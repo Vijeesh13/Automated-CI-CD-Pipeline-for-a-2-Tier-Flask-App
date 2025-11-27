@@ -2,7 +2,6 @@ pipeline {
     agent any
 
     environment {
-        // Update these if needed
         APP_DIR = "/home/ubuntu/2-tier-app"
         PYTHON = "python3"
     }
@@ -20,10 +19,10 @@ pipeline {
             steps {
                 echo "Installing Python dependencies..."
                 sh '''
-                apt update -y
-                apt install -y python3 python3-pip
-                pip3 install --upgrade pip
-                pip3 install -r requirements.txt
+                    apt update -y
+                    apt install -y python3 python3-pip
+                    pip3 install --upgrade pip
+                    pip3 install -r requirements.txt
                 '''
             }
         }
@@ -32,22 +31,38 @@ pipeline {
             steps {
                 echo "Running tests..."
                 sh '''
-                if [ -f "pytest.ini" ] || [ -d "tests" ]; then
-                    pip3 install pytest
-                    pytest || true
-                else
-                    echo "No tests found, skipping..."
-                fi
+                    if [ -f "pytest.ini" ] || [ -d "tests" ]; then
+                        pip3 install pytest
+                        pytest || true
+                    else
+                        echo "No tests found, skipping..."
+                    fi
                 '''
             }
         }
 
         stage('Deploy to EC2') {
             steps {
-                echo "Deploying application to EC2 server..."
+                echo "Deploying application..."
                 sh '''
-                # Replace this with your actual deployment steps
-                cp -r * ${APP_DIR}/
-                systemctl restart flaskapp || true
-                e
+                    cp -r * ${APP_DIR}/
+                    if systemctl status flaskapp >/dev/null 2>&1; then
+                        systemctl restart flaskapp
+                    else
+                        echo "Flask systemd service not found, skipping restart."
+                    fi
+                '''
+            }
+        }
+    }
+
+    post {
+        success {
+            echo "Pipeline completed successfully!"
+        }
+        failure {
+            echo "Pipeline failed!"
+        }
+    }
+}
 
