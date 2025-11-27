@@ -3,7 +3,6 @@ pipeline {
 
     environment {
         APP_DIR = "/home/ubuntu/2-tier-app"
-        PYTHON = "python3"
     }
 
     stages {
@@ -19,8 +18,6 @@ pipeline {
             steps {
                 echo "Installing Python dependencies..."
                 sh '''
-                    apt update -y
-                    apt install -y python3 python3-pip
                     pip3 install --upgrade pip
                     pip3 install -r requirements.txt
                 '''
@@ -49,7 +46,7 @@ pipeline {
                     if systemctl status flaskapp >/dev/null 2>&1; then
                         systemctl restart flaskapp
                     else
-                        echo "Flask systemd service not found, skipping restart."
+                        echo "Flask service not found, skipping restart."
                     fi
                 '''
             }
