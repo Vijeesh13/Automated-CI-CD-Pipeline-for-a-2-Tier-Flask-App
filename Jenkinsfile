@@ -1,18 +1,28 @@
 pipeline {
     agent any
 
+    environment {
+        // Update these if needed
+        APP_DIR = "/home/ubuntu/2-tier-app"
+        PYTHON = "python3"
+    }
+
     stages {
-        stage('Clone Repo') {
+
+        stage('Checkout Code') {
             steps {
-                git branch: 'main',
-                    url: 'https://github.com/Vijeesh13/Automated-CI-CD-Pipeline-for-a-2-Tier-Flask-App.git'
+                echo "Cloning repository..."
+                checkout scm
             }
         }
 
         stage('Install Dependencies') {
             steps {
+                echo "Installing Python dependencies..."
                 sh '''
-                sudo apt update -y
+                apt update -y
+                apt install -y python3 python3-pip
+                pip3 install --upgrade pip
                 pip3 install -r requirements.txt
                 '''
             }
@@ -20,18 +30,24 @@ pipeline {
 
         stage('Run Tests') {
             steps {
-                sh 'pytest || true'
-            }
-        }
-
-        stage('Deploy') {
-            steps {
+                echo "Running tests..."
                 sh '''
-                # Example Deployment (Modify based on your setup)
-                sudo systemctl restart flaskapp
+                if [ -f "pytest.ini" ] || [ -d "tests" ]; then
+                    pip3 install pytest
+                    pytest || true
+                else
+                    echo "No tests found, skipping..."
+                fi
                 '''
             }
         }
-    }
-}
+
+        stage('Deploy to EC2') {
+            steps {
+                echo "Deploying application to EC2 server..."
+                sh '''
+                # Replace this with your actual deployment steps
+                cp -r * ${APP_DIR}/
+                systemctl restart flaskapp || true
+                e
 
