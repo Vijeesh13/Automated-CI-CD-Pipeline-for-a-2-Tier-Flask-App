@@ -2,11 +2,11 @@ pipeline {
     agent any
 
     environment {
-        EC2_USER   = "ubuntu"
-        EC2_HOST   = "13.201.33.136"
-        EC2_PATH   = "/home/ubuntu/2-tier-app"
-        SSH_KEY_ID = "ec2-key"
-        PYTHON_CMD = "python3"
+        EC2_USER    = "ubuntu"
+        EC2_HOST    = "15.206.157.50"
+        EC2_PATH    = "/home/ubuntu/Automated-CI-CD-Pipeline-for-a-2-Tier-Flask-App"
+        SSH_KEY_ID  = "new-key"
+        PYTHON_CMD  = "python3"
     }
 
     stages {
@@ -22,8 +22,8 @@ pipeline {
             steps {
                 echo "Installing Python dependencies..."
                 sh """
-                ${PYTHON_CMD} -m pip install --upgrade pip --user
-                ${PYTHON_CMD} -m pip install --user -r requirements.txt
+                    ${PYTHON_CMD} -m pip install --upgrade pip --user
+                    ${PYTHON_CMD} -m pip install --user -r requirements.txt
                 """
             }
         }
@@ -32,37 +32,43 @@ pipeline {
             steps {
                 echo "Running tests..."
                 sh """
-                if [ -d tests ]; then
-                    ${PYTHON_CMD} -m pip install --user pytest
-                    ${PYTHON_CMD} -m pytest || true
-                else
-                    echo "No tests found — skipping."
-                fi
+                    if [ -d tests ]; then
+                        ${PYTHON_CMD} -m pip install --user pytest
+                        ${PYTHON_CMD} -m pytest || true
+                    else
+                        echo "No tests found — skipping."
+                    fi
                 """
             }
         }
 
         stage('Deploy to EC2') {
             steps {
-                echo "Deploying application to EC2..."
-                sshagent(credentials: [SSH_KEY_ID]) {
+                echo "Deploying to EC2 instance..."
+
+                sshagent(credentials: ["${SSH_KEY_ID}"]) {
                     sh """
-                    ssh -o StrictHostKeyChecking=no ${EC2_USER}@${EC2_HOST} "mkdir -p ${EC2_PATH}"
-                    scp -o StrictHostKeyChecking=no -r ./* ${EC2_USER}@${EC2_HOST}:${EC2_PATH}/
-                    ssh -o StrictHostKeyChecking=no ${EC2_USER}@${EC2_HOST} "sudo systemctl daemon-reload"
-                    ssh -o StrictHostKeyChecking=no ${EC2_USER}@${EC2_HOST} "sudo systemctl restart flaskapp || true"
+                        # Create directory if not exists
+                        ssh -o StrictHostKeyChecking=no ${EC2_USER}@${EC2_HOST} "mkdir -p ${EC2_PATH}"
+
+                        # Copy project files
+                        rsync -avz -e "ssh -o StrictHostKeyChecking=no" ./ ${EC2_USER}@${EC2_HOST}:${EC2_PATH}
+
+                        # Install dependencies on EC2 & restart app
+                        ssh -o StrictHostKeyChecking=no ${EC2_USER}@${EC2_HOST} "
+                            cd ${EC2_PATH}
+                            sudo python3 -m pip install --upgrade pip
+                            sudo python3 -m pip install -r requirements.txt
+
+                            # Kill old process
+                            sudo pkill -f app.py || true
+
+                            # Run app in background
+                            nohup python3 app.py > app.log 2>&1 &
+                        "
                     """
                 }
             }
-        }
-    }
-
-    post {
-        success {
-            echo "Pipeline SUCCESS"
-        }
-        failure {
-            echo "Pipeline FAILED"
         }
     }
 }
