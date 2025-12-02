@@ -36,7 +36,7 @@ services:
       - two-tier-nt
     depends_on:
       mysql:
-        condition:service_healthy
+        condition: service_healthy
 
     restart: always
     healthcheck:
